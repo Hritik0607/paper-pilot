@@ -173,12 +173,12 @@ ollama_data/
 
 # Data directories
 data/
+notebooks/
 
 # Test files and output
 test_*.py
 test_output/
 test_data/
-notebooks/
 
 
 
