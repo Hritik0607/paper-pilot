@@ -1,7 +1,7 @@
 [project]
-name = "moai-zero-to-rag"
+name = "paper-pilot"
 version = "0.1.0"
-description = "Mother-of-AI Phase-1-Zero to RAG"
+description = "Paper Pilot"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi[standard]>=0.115.12",
@@ -17,6 +17,8 @@ dependencies = [
     "docling>=2.43.0",
     "python-dateutil>=2.9.0.post0",
     "sentence-transformers>=5.1.0",
+    "gradio>=4.0.0",
+    "mcp>=1.13.1",
 ]
 readme = "README.md"
 
