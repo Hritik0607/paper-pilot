@@ -1,8 +1,16 @@
 from functools import lru_cache
-from typing import Annotated, Generator
+from typing import TYPE_CHECKING, Annotated, Generator, Optional
 
-from fastapi import Depends, Request
-from sqlalchemy.orm import Session
+if TYPE_CHECKING:
+    from fastapi import Depends, Request
+    from sqlalchemy.orm import Session
+else:
+    try:
+        from fastapi import Depends, Request
+        from sqlalchemy.orm import Session
+    except ImportError:
+        pass
+
 from src.config import Settings
 from src.db.interfaces.base import BaseDatabase
 from src.services.arxiv.client import ArxivClient
@@ -12,6 +20,9 @@ from src.services.langfuse.client import LangfuseTracer
 from src.services.ollama.client import OllamaClient
 from src.services.opensearch.client import OpenSearchClient
 from src.services.pdf_parser.parser import PDFParserService
+from src.services.telegram.bot import TelegramBot
+from src.services.agents.agentic_rag import AgenticRAGService
+from src.services.agents.factory import make_agentic_rag_service
 
 
 @lru_cache
@@ -71,6 +82,11 @@ def get_cache_client(request: Request) -> CacheClient | None:
     return getattr(request.app.state, "cache_client", None)
 
 
+def get_telegram_service(request: Request) -> Optional[TelegramBot]:
+    """Get Telegram service from the request state."""
+    return getattr(request.app.state, "telegram_service", None)
+
+
 # Dependency annotations
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 DatabaseDep = Annotated[BaseDatabase, Depends(get_database)]
@@ -82,3 +98,23 @@ EmbeddingsDep = Annotated[JinaEmbeddingsClient, Depends(get_embeddings_service)]
 OllamaDep = Annotated[OllamaClient, Depends(get_ollama_client)]
 LangfuseDep = Annotated[LangfuseTracer, Depends(get_langfuse_tracer)]
 CacheDep = Annotated[CacheClient | None, Depends(get_cache_client)]
+TelegramDep = Annotated[Optional[TelegramBot], Depends(get_telegram_service)]
+
+
+def get_agentic_rag_service(
+    opensearch: OpenSearchDep,
+    ollama: OllamaDep,
+    embeddings: EmbeddingsDep,
+    langfuse: LangfuseDep,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> AgenticRAGService:
+    """Get agentic RAG service."""
+    return make_agentic_rag_service(
+        opensearch_client=opensearch,
+        ollama_client=ollama,
+        embeddings_client=embeddings,
+        langfuse_tracer=langfuse,
+    )
+
+
+AgenticRAGDep = Annotated[AgenticRAGService, Depends(get_agentic_rag_service)]

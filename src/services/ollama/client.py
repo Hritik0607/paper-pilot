@@ -21,6 +21,17 @@ class OllamaClient:
         self.prompt_builder = RAGPromptBuilder()
         self.response_parser = ResponseParser()
 
+    def get_langchain_model(self, model: str, temperature: float = 0.0):
+        """Return a LangChain chat model for the agent nodes (guardrail, grading, rewrite, answer)."""
+        from langchain_ollama import ChatOllama
+
+        return ChatOllama(
+            model=model,
+            base_url=self.base_url,
+            temperature=temperature,
+            client_kwargs={"timeout": self.timeout.read},
+        )
+
     async def health_check(self) -> Dict[str, Any]:
         """
         Check if Ollama service is healthy and responding.
@@ -89,7 +100,11 @@ class OllamaClient:
             **kwargs: Additional generation parameters
 
         Returns:
-            Response dictionary or None if failed
+            Response dictionary with added usage_metadata field containing:
+                - prompt_tokens: Number of tokens in the prompt
+                - completion_tokens: Number of tokens in the completion
+                - total_tokens: Total tokens used
+                - latency_ms: Generation latency in milliseconds
         """
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -99,7 +114,41 @@ class OllamaClient:
                 response = await client.post(f"{self.base_url}/api/generate", json=data)
 
                 if response.status_code == 200:
-                    return response.json()
+                    result = response.json()
+
+                    # Parse Ollama usage metadata and convert to Langfuse-compatible format
+                    usage_metadata = {}
+
+                    # Ollama returns these fields in the response
+                    if "prompt_eval_count" in result:
+                        usage_metadata["prompt_tokens"] = result.get("prompt_eval_count", 0)
+                    if "eval_count" in result:
+                        usage_metadata["completion_tokens"] = result.get("eval_count", 0)
+
+                    # Calculate total tokens
+                    if usage_metadata:
+                        usage_metadata["total_tokens"] = (
+                            usage_metadata.get("prompt_tokens", 0) +
+                            usage_metadata.get("completion_tokens", 0)
+                        )
+
+                    # Parse timing information (convert nanoseconds to milliseconds)
+                    if "total_duration" in result:
+                        # Ollama returns duration in nanoseconds
+                        usage_metadata["latency_ms"] = round(result["total_duration"] / 1_000_000, 2)
+
+                    # Add timing breakdown if available
+                    if "prompt_eval_duration" in result:
+                        usage_metadata["prompt_eval_duration_ms"] = round(result["prompt_eval_duration"] / 1_000_000, 2)
+                    if "eval_duration" in result:
+                        usage_metadata["eval_duration_ms"] = round(result["eval_duration"] / 1_000_000, 2)
+
+                    # Attach usage metadata to the response
+                    result["usage_metadata"] = usage_metadata
+
+                    logger.debug(f"Usage metadata: {usage_metadata}")
+
+                    return result
                 else:
                     raise OllamaException(f"Generation failed: {response.status_code}")
 
