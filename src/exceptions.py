@@ -14,7 +14,7 @@ class ParsingException(Exception):
     """Base exception for parsing-related errors."""
 
 
-# PDF parsing exceptions (implemented)
+# Week 2: PDF parsing exceptions (implemented)
 class PDFParsingException(ParsingException):
     """Base exception for PDF parsing-related errors."""
 
@@ -35,12 +35,12 @@ class PDFCacheException(Exception):
     """Exception raised for PDF cache-related errors."""
 
 
-# OpenSearch exceptions (placeholders)
+# Week 3+: OpenSearch exceptions (placeholders for Week 1)
 class OpenSearchException(Exception):
     """Base exception for OpenSearch-related errors."""
 
 
-# ArXiv API exceptions
+# Week 2+: ArXiv API exceptions
 class ArxivAPIException(Exception):
     """Base exception for arXiv API-related errors."""
 
@@ -57,7 +57,7 @@ class ArxivParseError(ArxivAPIException):
     """Exception raised when arXiv API response parsing fails."""
 
 
-# Metadata fetching exceptions
+# Week 2+: Metadata fetching exceptions
 class MetadataFetchingException(Exception):
     """Base exception for metadata fetching pipeline errors."""
 
