@@ -1,4 +1,5 @@
 import json
+import os
 import logging
 from typing import AsyncIterator
 
@@ -8,7 +9,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 # Configuration
-API_BASE_URL = "http://localhost:8000/api/v1"
+API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8000/api/v1")
 DEFAULT_MODEL = "llama3.2:1b"
 MODEL_CHOICES = ["llama3.2:1b", "llama3.2:3b", "llama3.1:8b", "qwen2.5:7b"]
 
