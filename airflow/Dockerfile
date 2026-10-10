@@ -38,7 +38,8 @@ RUN pip install --no-cache-dir \
 
 # Copy requirements and install project dependencies
 COPY requirements-airflow.txt /tmp/requirements-airflow.txt
-RUN pip install --no-cache-dir -r /tmp/requirements-airflow.txt
+RUN pip install --no-cache-dir --default-timeout=300 --retries 10 torch torchvision --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir --default-timeout=300 --retries 10 -r /tmp/requirements-airflow.txt
 
 # Copy and set up entrypoint script
 COPY entrypoint.sh /entrypoint.sh

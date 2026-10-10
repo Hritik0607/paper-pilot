@@ -1,7 +1,7 @@
 [project]
-name = "moai-zero-to-rag"
+name = "paper-pilot"
 version = "0.1.0"
-description = "Mother-of-AI Phase-1-Zero to RAG"
+description = "Paper PIlot"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi[standard]>=0.115.12",
