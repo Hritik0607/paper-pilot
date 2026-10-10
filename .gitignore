@@ -100,6 +100,8 @@ celerybeat.pid
 
 # Environments
 .env
+.env_local
+.env_aws
 .venv
 env/
 venv/
@@ -150,7 +152,7 @@ CLAUDE.md
 .DS_Store
 
 # Docker
-.dockerignore
+# .dockerignore
 
 # Airflow runtime files (generated in airflow/ folder)
 airflow/logs/
