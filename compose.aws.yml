@@ -1,0 +1,179 @@
+# PaperPilot on AWS: trimmed compose file (Lesson 7)
+# Always on : postgres, opensearch, redis, api, gradio
+# Optional  : ollama (profile "llm"), airflow (profile "ingest")
+# Only api (8000) and gradio (7861) are published. Airflow UI only via SSH tunnel.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rag-postgres
+    environment:
+      - POSTGRES_DB=rag_db
+      - POSTGRES_USER=rag_user
+      - POSTGRES_PASSWORD=rag_password
+      - POSTGRES_HOST_AUTH_METHOD=password
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag_user -d rag_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - rag-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: rag-redis
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - rag-network
+
+  opensearch:
+    image: opensearchproject/opensearch:2.19.0
+    container_name: rag-opensearch
+    environment:
+      - discovery.type=single-node
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - DISABLE_SECURITY_PLUGIN=true
+      - bootstrap.memory_lock=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - rag-network
+
+  api:
+    build: .
+    image: paperpilot-api:latest
+    container_name: rag-api
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    env_file:
+      - .env
+    environment:
+      - OPENSEARCH_HOST=http://opensearch:9200
+      - OPENSEARCH__HOST=http://opensearch:9200
+      - OLLAMA_HOST=http://ollama:11434
+      - POSTGRES_DATABASE_URL=postgresql+psycopg2://rag_user:rag_password@postgres:5432/rag_db
+      - REDIS__HOST=redis
+    restart: unless-stopped
+    networks:
+      - rag-network
+
+  gradio:
+    build: .
+    image: paperpilot-api:latest
+    container_name: rag-gradio
+    command: ["python", "-c", "from src.gradio_app import main; main()"]
+    ports:
+      - "7861:7861"
+    depends_on:
+      - api
+    environment:
+      - API_BASE_URL=http://api:8000/api/v1
+    restart: unless-stopped
+    networks:
+      - rag-network
+
+  # ---- optional: local LLM (start with: --profile llm) ----
+  ollama:
+    image: ollama/ollama:0.11.2
+    container_name: rag-ollama
+    profiles: ["llm"]
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - rag-network
+
+  # ---- optional: one-time paper loading (start with: --profile ingest) ----
+  airflow:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: rag-airflow
+    profiles: ["ingest"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - AIRFLOW_HOME=/opt/airflow
+      - PYTHONPATH=/opt/airflow/src
+      - POSTGRES_DATABASE_URL=postgresql+psycopg2://rag_user:rag_password@postgres:5432/rag_db
+      - OPENSEARCH_HOST=http://opensearch:9200
+      - OPENSEARCH__HOST=http://opensearch:9200
+      - OLLAMA_HOST=http://ollama:11434
+      - REDIS__HOST=redis
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - airflow_logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./src:/opt/airflow/src
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    networks:
+      - rag-network
+
+volumes:
+  postgres_data:
+  opensearch_data:
+  redis_data:
+  ollama_data:
+  airflow_logs:
+
+networks:
+  rag-network:
+    driver: bridge
+  
