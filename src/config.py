@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 from typing import List, Literal, Optional
+import json
+from functools import lru_cache
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -176,6 +178,8 @@ class Settings(BaseConfigSettings):
 
     # Jina AI embeddings configuration
     jina_api_key: str = ""
+    jina_secret_id: str = ""
+    aws_region: str = "ap-south-1"
 
     arxiv: ArxivSettings = Field(default_factory=ArxivSettings)
     pdf_parser: PDFParserSettings = Field(default_factory=PDFParserSettings)
@@ -192,6 +196,17 @@ class Settings(BaseConfigSettings):
             raise ValueError("Database URL must start with 'postgresql://' or 'postgresql+psycopg2://'")
         return v
 
+@lru_cache(maxsize=None)
+def read_secret_value(secret_id: str, region: str, field: str) -> str:
+    import boto3
+
+    client = boto3.client("secretsmanager", region_name=region)
+    raw = client.get_secret_value(SecretId=secret_id)["SecretString"]
+    return json.loads(raw)[field]
 
 def get_settings() -> Settings:
-    return Settings()
+    settings = Settings()
+    if settings.jina_secret_id and not settings.jina_api_key:
+        key = read_secret_value(settings.jina_secret_id, settings.aws_region, "JINA_API_KEY")
+        settings = settings.model_copy(update={"jina_api_key": key})
+    return settings
