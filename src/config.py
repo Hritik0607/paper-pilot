@@ -40,6 +40,8 @@ class ArxivSettings(BaseConfigSettings):
     download_retry_delay_base: float = 5.0
     max_concurrent_downloads: int = 5
     max_concurrent_parsing: int = 1
+    pdf_bucket: str = ""
+    pdf_bucket_region: str = "ap-south-1"
 
     namespaces: dict = {
         "atom": "http://www.w3.org/2005/Atom",

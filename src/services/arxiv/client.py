@@ -11,6 +11,7 @@ import httpx
 from src.config import ArxivSettings
 from src.exceptions import ArxivAPIException, ArxivAPITimeoutError, ArxivParseError, PDFDownloadException, PDFDownloadTimeoutError
 from src.schemas.arxiv.paper import ArxivPaper
+from src.services.arxiv.s3_store import fetch_pdf, upload_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -418,14 +419,24 @@ class ArxivClient:
             return None
 
         pdf_path = self._get_pdf_path(paper.arxiv_id)
+        bucket = self._settings.pdf_bucket
+        region = self._settings.pdf_bucket_region
+        s3_key = f"arxiv/{pdf_path.name}"
 
         # Return cached PDF if exists
         if pdf_path.exists() and not force_download:
             logger.info(f"Using cached PDF: {pdf_path.name}")
             return pdf_path
 
-        # Download with retry
+        # Safe copy in S3? Take it from there instead of arXiv
+        if bucket and not force_download and fetch_pdf(pdf_path, bucket, s3_key, region):
+            logger.info(f"Took PDF from S3: {s3_key}")
+            return pdf_path
+
+        # Download with retry, then keep a safe copy in S3
         if await self._download_with_retry(paper.pdf_url, pdf_path):
+            if bucket:
+                upload_pdf(pdf_path, bucket, s3_key, region)
             return pdf_path
         else:
             return None
