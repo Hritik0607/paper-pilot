@@ -3,6 +3,13 @@
 # Optional  : ollama (profile "llm"), airflow (profile "ingest")
 # Only api (8000) and gradio (7861) are published. Airflow UI only via SSH tunnel.
 
+x-logging: &default-logging
+  driver: awslogs
+  options:
+    awslogs-region: ap-south-1
+    awslogs-group: /paperpilot/containers
+    tag: "{{.Name}}"
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -24,6 +31,7 @@ services:
     restart: unless-stopped
     networks:
       - rag-network
+    logging: *default-logging
 
   redis:
     image: redis:7-alpine
@@ -40,6 +48,7 @@ services:
     restart: unless-stopped
     networks:
       - rag-network
+    logging: *default-logging
 
   opensearch:
     image: opensearchproject/opensearch:2.19.0
@@ -64,6 +73,7 @@ services:
     restart: unless-stopped
     networks:
       - rag-network
+    logging: *default-logging
 
   api:
     build: .
@@ -95,6 +105,7 @@ services:
     restart: unless-stopped
     networks:
       - rag-network
+    logging: *default-logging
 
   gradio:
     build: .
@@ -110,6 +121,7 @@ services:
     restart: unless-stopped
     networks:
       - rag-network
+    logging: *default-logging
 
   # ---- optional: local LLM (start with: --profile llm) ----
   ollama:
@@ -127,6 +139,7 @@ services:
     restart: unless-stopped
     networks:
       - rag-network
+    logging: *default-logging
 
   # ---- optional: one-time paper loading (start with: --profile ingest) ----
   airflow:
@@ -165,6 +178,7 @@ services:
       start_period: 120s
     networks:
       - rag-network
+    logging: *default-logging
 
 volumes:
   postgres_data:
